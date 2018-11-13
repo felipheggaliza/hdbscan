@@ -264,6 +264,9 @@ cdef class KDTreeBoruvkaAlgorithm (object):
     n_jobs : int, optional (default=4)
         The number of parallel jobs used to compute core distances.
 
+    n_chunks : int, optional (default=4)
+        The number of chunks used to split the dataset in order to compute core distances.
+        
     **kwargs :
         Keyword args passed to the metric.
     """
@@ -277,6 +280,7 @@ cdef class KDTreeBoruvkaAlgorithm (object):
     cdef np.double_t alpha
     cdef np.int8_t approx_min_span_tree
     cdef np.intp_t n_jobs
+    cdef np.intp_t n_chunks
     cdef np.intp_t min_samples
     cdef np.intp_t num_points
     cdef np.intp_t num_nodes
@@ -398,19 +402,17 @@ cdef class KDTreeBoruvkaAlgorithm (object):
         # A shortcut: if we have a lot of points then we can split the points
         # into  n_chunks and query them in parallel. On multicore systems
         # (most systems) this amounts to a performance improvement.
-        if self.tree.data.shape[0] > 16384 and self.n_jobs > 1 and self.n_chunks > 1:
+        if self.tree.data.shape[0] > 16384 and self.n_jobs > 1 and self.n_chunks > 0:
             
-           if self.n_chunks == 1:
-              datasets = [np.asarray(data)]
-              return datasets
-
-           num_points = data.shape[0]
-           pp_chunks = num_points // n_chunks
-           datasets = []
-           for c in range(n_chunks-1):
-               datasets.append(np.asarray(data[pp_chunks*c:pp_chunks*(c+1)]))
-           datasets.append(np.asarray(data[(pp_chunks*(n_chunks-1)):num_points]))
-
+            if self.n_chunks == 1:
+              datasets = [np.asarray(self.tree.data)]
+            else: 
+              pp_chunks = self.num_points // self.n_chunks
+              datasets = []
+              for c in range(self.n_chunks-1):
+                datasets.append(np.asarray(self.tree.data[pp_chunks*c:pp_chunks*(c+1)]))
+              datasets.append(np.asarray(self.tree.data[(pp_chunks*(self.n_chunks-1)):self.num_points])
+                            
             knn_data = Parallel(n_jobs=self.n_jobs)(
                 delayed(_core_dist_query,
                         check_pickle=False)
@@ -878,6 +880,9 @@ cdef class BallTreeBoruvkaAlgorithm (object):
     n_jobs : int, optional (default=4)
         The number of parallel jobs used to compute core distances.
 
+    n_chunks : int, optional (default=4)
+        The number of chunks used to split the dataset in order to compute core distances.
+
     **kwargs :
         Keyword args passed to the metric.
     """
@@ -890,6 +895,7 @@ cdef class BallTreeBoruvkaAlgorithm (object):
     cdef np.double_t alpha
     cdef np.int8_t approx_min_span_tree
     cdef np.intp_t n_jobs
+    cdef np.intp_t n_chunks
     cdef np.intp_t min_samples
     cdef np.intp_t num_points
     cdef np.intp_t num_nodes
@@ -928,7 +934,7 @@ cdef class BallTreeBoruvkaAlgorithm (object):
     cdef np.ndarray candidate_distance_arr
 
     def __init__(self, tree, min_samples=5, metric='euclidean',
-                 alpha=1.0, leaf_size=20, approx_min_span_tree=False, n_jobs=4,
+                 alpha=1.0, leaf_size=20, approx_min_span_tree=False, n_jobs=4, n_chunks =4,
                  **kwargs):
 
         self.core_dist_tree = tree
@@ -940,7 +946,7 @@ cdef class BallTreeBoruvkaAlgorithm (object):
         self.alpha = alpha
         self.approx_min_span_tree = approx_min_span_tree
         self.n_jobs = n_jobs
-
+        self.n_chunks = n_chunks
         self.num_points = self.tree.data.shape[0]
         self.num_features = self.tree.data.shape[1]
         self.num_nodes = self.tree.node_data.shape[0]
@@ -1005,16 +1011,16 @@ cdef class BallTreeBoruvkaAlgorithm (object):
         cdef np.ndarray[np.double_t, ndim=2] knn_dist
         cdef np.ndarray[np.intp_t, ndim=2] knn_indices
 
-        if self.tree.data.shape[0] > 16384 and self.n_jobs > 1:
-            datasets = [np.asarray(self.tree.data[0:self.num_points//4]),
-                        np.asarray(self.tree.data[self.num_points//4:
-                                                  self.num_points//2]),
-                        np.asarray(self.tree.data[self.num_points//2:
-                                                  3*(self.num_points//4)]),
-                        np.asarray(self.tree.data[3*(self.num_points//4):
-                                                  self.num_points])
-                        ]
-
+        if self.tree.data.shape[0] > 16384 and self.n_jobs > 1 and self.n_chunks > 0:
+           if self.n_chunks == 1:
+             datasets = [np.asarray(self.tree.data)]
+           else: 
+             pp_chunks = self.num_points // self.n_chunks
+             datasets = []
+             for c in range(self.n_chunks-1):
+               datasets.append(np.asarray(self.tree.data[pp_chunks*c:pp_chunks*(c+1)]))
+             datasets.append(np.asarray(self.tree.data[(pp_chunks*(self.n_chunks-1)):self.num_points])
+                
             knn_data = Parallel(n_jobs=self.n_jobs)(
                 delayed(_core_dist_query,
                         check_pickle=False)
