@@ -1012,14 +1012,14 @@ cdef class BallTreeBoruvkaAlgorithm (object):
         cdef np.ndarray[np.intp_t, ndim=2] knn_indices
 
         if self.tree.data.shape[0] > 16384 and self.n_jobs > 1 and self.n_chunks > 0:
-           if self.n_chunks == 1:
-             datasets = [np.asarray(self.tree.data)]
-           else: 
-             pp_chunks = self.num_points // self.n_chunks
-             datasets = []
-             for c in range(self.n_chunks-1):
-               datasets.append(np.asarray(self.tree.data[pp_chunks*c:pp_chunks*(c+1)]))
-             datasets.append(np.asarray(self.tree.data[(pp_chunks*(self.n_chunks-1)):self.num_points]))
+            if self.n_chunks == 1:
+              datasets = [np.asarray(self.tree.data)]
+            else: 
+              pp_chunks = self.num_points // self.n_chunks
+              datasets = []
+              for c in range(self.n_chunks-1):
+                datasets.append(np.asarray(self.tree.data[pp_chunks*c:pp_chunks*(c+1)]))
+              datasets.append(np.asarray(self.tree.data[(pp_chunks*(self.n_chunks-1)):self.num_points]))
                 
             knn_data = Parallel(n_jobs=self.n_jobs)(
                 delayed(_core_dist_query,
