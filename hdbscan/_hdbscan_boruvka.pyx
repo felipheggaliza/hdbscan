@@ -411,7 +411,7 @@ cdef class KDTreeBoruvkaAlgorithm (object):
               datasets = []
               for c in range(self.n_chunks-1):
                 datasets.append(np.asarray(self.tree.data[pp_chunks*c:pp_chunks*(c+1)]))
-              datasets.append(np.asarray(self.tree.data[(pp_chunks*(self.n_chunks-1)):self.num_points])
+              datasets.append(np.asarray(self.tree.data[(pp_chunks*(self.n_chunks-1)):self.num_points]))
                             
             knn_data = Parallel(n_jobs=self.n_jobs)(
                 delayed(_core_dist_query,
